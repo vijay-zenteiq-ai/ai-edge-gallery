@@ -120,6 +120,7 @@ fun LlmAskImageScreen(
   allowEditingSystemPrompt: Boolean = false,
   curSystemPrompt: String = "",
   onSystemPromptChanged: (String) -> Unit = {},
+  sendMessageTrigger: SendMessageTrigger? = null,
 ) {
   ChatViewWrapper(
     viewModel = viewModel,
@@ -130,6 +131,7 @@ fun LlmAskImageScreen(
     allowEditingSystemPrompt = allowEditingSystemPrompt,
     curSystemPrompt = curSystemPrompt,
     onSystemPromptChanged = onSystemPromptChanged,
+    sendMessageTrigger = sendMessageTrigger,
     showImagePicker = true,
     showAudioPicker = false,
     emptyStateComposable = { model ->
@@ -168,6 +170,7 @@ fun LlmAskAudioScreen(
   allowEditingSystemPrompt: Boolean = false,
   curSystemPrompt: String = "",
   onSystemPromptChanged: (String) -> Unit = {},
+  sendMessageTrigger: SendMessageTrigger? = null,
 ) {
   ChatViewWrapper(
     viewModel = viewModel,
@@ -178,6 +181,7 @@ fun LlmAskAudioScreen(
     allowEditingSystemPrompt = allowEditingSystemPrompt,
     curSystemPrompt = curSystemPrompt,
     onSystemPromptChanged = onSystemPromptChanged,
+    sendMessageTrigger = sendMessageTrigger,
     showImagePicker = false,
     showAudioPicker = true,
     emptyStateComposable = {

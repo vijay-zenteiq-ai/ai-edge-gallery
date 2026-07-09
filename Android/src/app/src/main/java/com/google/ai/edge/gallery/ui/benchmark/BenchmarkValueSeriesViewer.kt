@@ -116,7 +116,7 @@ fun BenchmarkValueSeriesViewer(title: String, valueSeries: ValueSeries, onDismis
                         // Update on Press and Move events
                         if (
                           event.type == PointerEventType.Press ||
-                            event.type == PointerEventType.Move
+                          event.type == PointerEventType.Move
                         ) {
                           val tappedY = position.y
                           val value = effectiveMin + (1f - (tappedY / size.height)) * scaledYRange

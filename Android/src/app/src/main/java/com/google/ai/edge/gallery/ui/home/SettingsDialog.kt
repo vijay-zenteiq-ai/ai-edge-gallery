@@ -62,6 +62,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
@@ -82,7 +83,6 @@ import com.google.ai.edge.gallery.ui.theme.labelSmallNarrow
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.min
 
 private val THEME_OPTIONS = listOf(Theme.THEME_AUTO, Theme.THEME_LIGHT, Theme.THEME_DARK)
@@ -96,10 +96,11 @@ fun SettingsDialog(
 ) {
   var selectedTheme by remember { mutableStateOf(curThemeOverride) }
   var hfToken by remember { mutableStateOf(modelManagerViewModel.getTokenStatusAndData().data) }
-  val dateFormatter = remember {
+  val locale = LocalConfiguration.current.locales[0]
+  val dateFormatter = remember(locale) {
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
       .withZone(ZoneId.systemDefault())
-      .withLocale(Locale.getDefault())
+      .withLocale(locale)
   }
   var customHfToken by remember { mutableStateOf("") }
   var isFocused by remember { mutableStateOf(false) }
@@ -171,7 +172,7 @@ fun SettingsDialog(
                     // the correct theme.
                     val uiModeManager =
                       context.applicationContext.getSystemService(Context.UI_MODE_SERVICE)
-                        as UiModeManager
+                              as UiModeManager
                     if (theme == Theme.THEME_AUTO) {
                       uiModeManager.setApplicationNightMode(UiModeManager.MODE_NIGHT_AUTO)
                     } else if (theme == Theme.THEME_LIGHT) {
@@ -257,12 +258,12 @@ fun SettingsDialog(
                 Box(
                   modifier =
                     Modifier.border(
-                        width = if (isFocused) 2.dp else 1.dp,
-                        color =
-                          if (isFocused) MaterialTheme.colorScheme.primary
-                          else MaterialTheme.colorScheme.outline,
-                        shape = CircleShape,
-                      )
+                      width = if (isFocused) 2.dp else 1.dp,
+                      color =
+                        if (isFocused) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline,
+                      shape = CircleShape,
+                    )
                       .height(40.dp),
                   contentAlignment = Alignment.CenterStart,
                 ) {

@@ -109,6 +109,14 @@ interface DataStoreRepository {
 
   /** Returns whether a promo with the specified ID has been viewed. */
   fun hasViewedPromo(promoId: String): Boolean
+
+  fun readSavedPrompts(): List<String>
+
+  fun addSavedPrompt(prompt: String)
+
+  fun deleteSavedPrompt(prompt: String)
+
+  fun updateSavedPrompt(oldPrompt: String, newPrompt: String)
 }
 
 /** Repository for managing data using Proto DataStore. */
@@ -426,6 +434,39 @@ class DefaultDataStoreRepository(
     return runBlocking {
       val settings = dataStore.data.first()
       settings.viewedPromoIdList.contains(promoId)
+    }
+  }
+
+  override fun readSavedPrompts(): List<String> {
+    return runBlocking {
+      val userData = userDataDataStore.data.first()
+      userData.savedPromptsList
+    }
+  }
+
+  override fun addSavedPrompt(prompt: String) {
+    runBlocking {
+      userDataDataStore.updateData { userData ->
+        userData.toBuilder().addSavedPrompts(prompt).build()
+      }
+    }
+  }
+
+  override fun deleteSavedPrompt(prompt: String) {
+    runBlocking {
+      userDataDataStore.updateData { userData ->
+        val newList = userData.savedPromptsList.filter { it != prompt }
+        userData.toBuilder().clearSavedPrompts().addAllSavedPrompts(newList).build()
+      }
+    }
+  }
+
+  override fun updateSavedPrompt(oldPrompt: String, newPrompt: String) {
+    runBlocking {
+      userDataDataStore.updateData { userData ->
+        val newList = userData.savedPromptsList.map { if (it == oldPrompt) newPrompt else it }
+        userData.toBuilder().clearSavedPrompts().addAllSavedPrompts(newList).build()
+      }
     }
   }
 }

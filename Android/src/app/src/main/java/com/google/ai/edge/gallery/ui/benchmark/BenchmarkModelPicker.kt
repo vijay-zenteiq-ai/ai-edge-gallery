@@ -109,13 +109,13 @@ fun BenchmarkModelPicker(
             Row(
               modifier =
                 Modifier.clickable {
-                    onSelected(modelName)
-                    scope.launch {
-                      delay(200)
-                      sheetState.hide()
-                      showBottomSheet = false
-                    }
+                  onSelected(modelName)
+                  scope.launch {
+                    delay(200)
+                    sheetState.hide()
+                    showBottomSheet = false
                   }
+                }
                   .padding(horizontal = 16.dp, vertical = 6.dp)
                   .fillMaxWidth(),
               verticalAlignment = Alignment.CenterVertically,

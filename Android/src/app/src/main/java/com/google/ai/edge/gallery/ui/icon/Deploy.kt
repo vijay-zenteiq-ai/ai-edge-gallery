@@ -32,12 +32,12 @@ val Deployed_code: ImageVector
     }
     internal_Deployed_code =
       ImageVector.Builder(
-          name = "Deployed_code",
-          defaultWidth = 24.dp,
-          defaultHeight = 24.dp,
-          viewportWidth = 960f,
-          viewportHeight = 960f,
-        )
+        name = "Deployed_code",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 960f,
+        viewportHeight = 960f,
+      )
         .apply {
           path(
             fill = SolidColor(Color.Black),

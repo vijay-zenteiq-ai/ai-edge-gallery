@@ -153,12 +153,12 @@ data class ModelManagerUiState(
 ) {
   fun isModelInitialized(model: Model): Boolean {
     return modelInitializationStatus[model.name]?.status ==
-      ModelInitializationStatusType.INITIALIZED
+            ModelInitializationStatusType.INITIALIZED
   }
 
   fun isModelInitializing(model: Model): Boolean {
     return modelInitializationStatus[model.name]?.status ==
-      ModelInitializationStatusType.INITIALIZING
+            ModelInitializationStatusType.INITIALIZING
   }
 }
 
@@ -227,7 +227,9 @@ constructor(
   }
 
   fun getActiveCustomTasks(): List<CustomTask> {
-    return customTasks.toList()
+    val tasks = customTasks.toList()
+    Log.d(TAG, "Active custom tasks count: ${tasks.size}")
+    return tasks
   }
 
   fun getSelectedModel(): Model? {
@@ -258,7 +260,7 @@ constructor(
   fun getAllDownloadedModels(): List<Model> {
     return getAllModels().filter {
       uiState.value.modelDownloadStatus[it.name]?.status == ModelDownloadStatusType.SUCCEEDED &&
-        it.isLlm
+              it.isLlm
     }
   }
 
@@ -420,8 +422,8 @@ constructor(
       // Skip if initialized already.
       if (
         !force &&
-          uiState.value.modelInitializationStatus[model.name]?.status ==
-            ModelInitializationStatusType.INITIALIZED
+        uiState.value.modelInitializationStatus[model.name]?.status ==
+        ModelInitializationStatusType.INITIALIZED
       ) {
         Log.d(TAG, "Model '${model.name}' has been initialized. Skipping.")
         return@launch
@@ -537,7 +539,7 @@ constructor(
     // Delete downloaded file if status is failed or not_downloaded.
     if (
       status.status == ModelDownloadStatusType.FAILED ||
-        status.status == ModelDownloadStatusType.NOT_DOWNLOADED
+      status.status == ModelDownloadStatusType.NOT_DOWNLOADED
     ) {
       deleteFileFromExternalFilesDir(curModel.downloadFileName)
     }
@@ -660,13 +662,13 @@ constructor(
       }
       if (
         (task.id == BuiltInTaskId.LLM_ASK_IMAGE && model.llmSupportImage) ||
-          (task.id == BuiltInTaskId.LLM_ASK_AUDIO && model.llmSupportAudio) ||
-          (task.id == BuiltInTaskId.LLM_TINY_GARDEN && model.llmSupportTinyGarden) ||
-          (task.id == BuiltInTaskId.LLM_MOBILE_ACTIONS && model.llmSupportMobileActions) ||
-          (task.id != BuiltInTaskId.LLM_ASK_IMAGE &&
-            task.id != BuiltInTaskId.LLM_ASK_AUDIO &&
-            task.id != BuiltInTaskId.LLM_TINY_GARDEN &&
-            task.id != BuiltInTaskId.LLM_MOBILE_ACTIONS)
+        (task.id == BuiltInTaskId.LLM_ASK_AUDIO && model.llmSupportAudio) ||
+        (task.id == BuiltInTaskId.LLM_TINY_GARDEN && model.llmSupportTinyGarden) ||
+        (task.id == BuiltInTaskId.LLM_MOBILE_ACTIONS && model.llmSupportMobileActions) ||
+        (task.id != BuiltInTaskId.LLM_ASK_IMAGE &&
+                task.id != BuiltInTaskId.LLM_ASK_AUDIO &&
+                task.id != BuiltInTaskId.LLM_TINY_GARDEN &&
+                task.id != BuiltInTaskId.LLM_MOBILE_ACTIONS)
       ) {
         task.models.add(model)
         if (task.id == BuiltInTaskId.LLM_TINY_GARDEN) {
@@ -750,11 +752,11 @@ constructor(
 
   fun getAuthorizationRequest(): AuthorizationRequest {
     return AuthorizationRequest.Builder(
-        ProjectConfig.authServiceConfig,
-        ProjectConfig.clientId,
-        ResponseTypeValues.CODE,
-        ProjectConfig.redirectUri.toUri(),
-      )
+      ProjectConfig.authServiceConfig,
+      ProjectConfig.clientId,
+      ResponseTypeValues.CODE,
+      ProjectConfig.redirectUri.toUri(),
+    )
       .setScope("read-repos")
       .build()
   }
@@ -779,8 +781,8 @@ constructor(
         // Authorization successful, exchange the code for tokens
         var errorMessage: String? = null
         authService.performTokenRequest(response.createTokenExchangeRequest()) {
-          tokenResponse,
-          tokenEx ->
+            tokenResponse,
+            tokenEx ->
           if (tokenResponse != null) {
             if (tokenResponse.accessToken == null) {
               errorMessage = "Empty access token"
@@ -882,7 +884,7 @@ constructor(
             if (downloadStatus == ModelDownloadStatusType.PARTIALLY_DOWNLOADED) {
               if (
                 tokenStatusAndData.status == TokenStatus.NOT_EXPIRED &&
-                  tokenStatusAndData.data != null
+                tokenStatusAndData.data != null
               ) {
                 model.accessToken = tokenStatusAndData.data.accessToken
               }
@@ -943,11 +945,20 @@ constructor(
         }
 
         if (modelAllowlist == null) {
-          _uiState.update { it.copy(loadingModelAllowlistError = "Failed to load model list") }
+          // Try to load a generic allowlist as a fallback.
+          Log.w(TAG, "Trying fallback model allowlist URL.")
+          val fallbackUrl = "https://raw.githubusercontent.com/google-ai-edge/gallery/refs/heads/main/model_allowlists/1_0_15.json"
+          val fallbackData = getJsonResponse<ModelAllowlist>(url = fallbackUrl)
+          modelAllowlist = fallbackData?.jsonObj
+        }
+
+        if (modelAllowlist == null) {
+          Log.e(TAG, "Model allowlist is null after all loading attempts.")
+          _uiState.update { it.copy(loadingModelAllowlist = false, loadingModelAllowlistError = "Failed to load model list") }
           return@launch
         }
 
-        Log.d(TAG, "Allowlist: $modelAllowlist")
+        Log.d(TAG, "Allowlist model count: ${modelAllowlist.models.size}")
 
         val isAICoreAvailable by lazy {
           // Build a fast-lookup set of all supported device models.
@@ -965,6 +976,9 @@ constructor(
 
         // Convert models in the allowlist.
         val curTasks = getActiveCustomTasks().map { it.task }
+        for (task in curTasks) {
+          task.models.clear()
+        }
         val nameToModel = mutableMapOf<String, Model>()
         for (allowedModel in modelAllowlist.models) {
           if (allowedModel.disabled == true) {
@@ -1039,7 +1053,13 @@ constructor(
         // Wait for AICore models statuses and update download indicators
         checkAICoreModelStatuses()
       } catch (e: Exception) {
-        e.printStackTrace()
+        Log.e(TAG, "Error loading model allowlist", e)
+        _uiState.update {
+          it.copy(
+            loadingModelAllowlist = false,
+            loadingModelAllowlistError = e.message ?: "Unknown error",
+          )
+        }
       }
     }
   }
@@ -1108,9 +1128,10 @@ constructor(
   }
 
   private fun createEmptyUiState(): ModelManagerUiState {
+    val tasks = getActiveCustomTasks().map { it.task }
     return ModelManagerUiState(
-      tasks = listOf(),
-      tasksByCategory = mapOf(),
+      tasks = tasks,
+      tasksByCategory = tasks.groupBy { it.category.id },
       modelDownloadStatus = mapOf(),
       modelInitializationStatus = mapOf(),
     )
@@ -1181,8 +1202,8 @@ constructor(
 
     Log.d(TAG, "model download status: $modelDownloadStatus")
     return ModelManagerUiState(
-      tasks = getActiveCustomTasks().map { it.task }.toList(),
-      tasksByCategory = mapOf(),
+      tasks = tasks.values.toList(),
+      tasksByCategory = groupTasksByCategory(),
       modelDownloadStatus = modelDownloadStatus,
       modelInitializationStatus = modelInstances,
       textInputHistory = textInputHistory,
@@ -1210,14 +1231,14 @@ constructor(
     val llmSupportSpeculativeDecoding = info.llmConfig.supportSpeculativeDecoding
     val configs: MutableList<Config> =
       createLlmChatConfigs(
-          defaultMaxToken = llmMaxToken,
-          defaultTopK = info.llmConfig.defaultTopk,
-          defaultTopP = info.llmConfig.defaultTopp,
-          defaultTemperature = info.llmConfig.defaultTemperature,
-          accelerators = accelerators,
-          supportThinking = llmSupportThinking,
-          supportSpeculativeDecoding = llmSupportSpeculativeDecoding,
-        )
+        defaultMaxToken = llmMaxToken,
+        defaultTopK = info.llmConfig.defaultTopk,
+        defaultTopP = info.llmConfig.defaultTopp,
+        defaultTemperature = info.llmConfig.defaultTemperature,
+        accelerators = accelerators,
+        supportThinking = llmSupportThinking,
+        supportSpeculativeDecoding = llmSupportSpeculativeDecoding,
+      )
         .toMutableList()
     val capabilities: MutableList<ModelCapability> = mutableListOf()
     val capabilityToTaskTypes: MutableMap<ModelCapability, List<String>> = mutableMapOf()
@@ -1479,17 +1500,17 @@ constructor(
       }
     val downloadedFileExists =
       fileName.isNotEmpty() &&
-        ((model.localModelFilePathOverride.isEmpty() &&
-          isFileInExternalFilesDir(modelRelativePath)) ||
-          (model.localModelFilePathOverride.isNotEmpty() &&
-            File(model.localModelFilePathOverride).exists()))
+              ((model.localModelFilePathOverride.isEmpty() &&
+                      isFileInExternalFilesDir(modelRelativePath)) ||
+                      (model.localModelFilePathOverride.isNotEmpty() &&
+                              File(model.localModelFilePathOverride).exists()))
 
     val unzippedDirectoryExists =
       model.isZip &&
-        model.unzipDir.isNotEmpty() &&
-        isFileInExternalFilesDir(
-          listOf(model.normalizedName, version, model.unzipDir).joinToString(File.separator)
-        )
+              model.unzipDir.isNotEmpty() &&
+              isFileInExternalFilesDir(
+                listOf(model.normalizedName, version, model.unzipDir).joinToString(File.separator)
+              )
 
     return downloadedFileExists || unzippedDirectoryExists
   }

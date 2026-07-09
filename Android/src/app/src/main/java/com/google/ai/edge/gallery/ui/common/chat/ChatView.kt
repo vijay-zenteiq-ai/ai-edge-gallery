@@ -101,7 +101,11 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "AGChatView"
 
-data class SendMessageTrigger(val model: Model, val messages: List<ChatMessage>)
+data class SendMessageTrigger(
+  val model: Model,
+  val messages: List<ChatMessage>,
+  val id: String = UUID.randomUUID().toString(),
+)
 
 /**
  * A composable that displays a chat interface, allowing users to interact with different models
@@ -126,8 +130,8 @@ fun ChatView(
   mcpCount: Int = 0,
   onResetSessionClicked:
     (
-      model: Model, initialMessages: List<ChatMessage>, clearHistory: Boolean, onDone: () -> Unit,
-    ) -> Unit =
+    model: Model, initialMessages: List<ChatMessage>, clearHistory: Boolean, onDone: () -> Unit,
+  ) -> Unit =
     { _, _, _, onDone ->
       onDone()
     },

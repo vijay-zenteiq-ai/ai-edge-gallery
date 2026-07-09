@@ -1,3 +1,4 @@
+
 <!--
  Copyright 2025 Google LLC
 
@@ -95,6 +96,20 @@
   <string name="drawer_settings_description" translatable="true">Manage application settings</string>
   <string name="drawer_models_label" translatable="true">Models</string>
   <string name="drawer_models_description" translatable="true">Browse, try, and benchmark models</string>
+  <string name="drawer_prompt_library_label" translatable="true">Prompt Library</string>
+  <string name="drawer_prompt_library_description" translatable="true">Manage saved prompts</string>
+  <string name="prompt_library_title" translatable="true">Prompt Library</string>
+  <string name="prompt_library_placeholder" translatable="true">Enter new prompt</string>
+  <string name="prompt_library_save" translatable="true">Save</string>
+  <string name="prompt_library_saved_prompts" translatable="true">Saved Prompts</string>
+  <string name="prompt_library_empty_state" translatable="true">No prompts saved yet.</string>
+  <string name="prompt_library_delete_cd" translatable="true">Delete prompt</string>
+  <string name="prompt_library_edit_cd" translatable="true">Edit prompt</string>
+  <string name="prompt_library_edit_title" translatable="true">Edit Prompt</string>
+  <string name="prompt_library_cancel" translatable="true">Cancel</string>
+  <string name="prompt_library_update" translatable="true">Update</string>
+  <string name="prompt_library_view_cd" translatable="true">View prompt</string>
+  <string name="prompt_library_view_title" translatable="true">View Prompt</string>
   <string name="drawer_notifications_label" translatable="true">Notifications</string>
   <string name="drawer_notifications_description" translatable="true">View scheduled notifications</string>
   <string name="notifications_title" translatable="true">Notifications</string>

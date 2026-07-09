@@ -32,6 +32,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -46,6 +49,10 @@ import com.google.ai.edge.gallery.data.Category
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.runtime.runtimeHelper
+import com.google.ai.edge.gallery.ui.common.chat.ChatMessageText
+import com.google.ai.edge.gallery.ui.common.chat.ChatSide
+import com.google.ai.edge.gallery.ui.common.chat.SendMessageTrigger
+import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.theme.emptyStateContent
 import com.google.ai.edge.gallery.ui.theme.emptyStateTitle
 import com.google.ai.edge.litertlm.Contents
@@ -111,6 +118,41 @@ class LlmChatTask @Inject constructor() : CustomTask {
     LaunchedEffect(task) { viewModel.loadSystemPrompt(task) }
     val uiSystemPrompt by viewModel.uiSystemPrompt.collectAsState()
     val systemPromptUpdatedMessage = stringResource(R.string.system_prompt_updated)
+
+    val modelManagerUiState by myData.modelManagerViewModel.uiState.collectAsState()
+    val selectedModel = modelManagerUiState.selectedModel
+    val modelInitStatus = modelManagerUiState.modelInitializationStatus[selectedModel.name]
+    val llmChatUiState by viewModel.uiState.collectAsState()
+    var sendMessageTrigger by remember { mutableStateOf<SendMessageTrigger?>(null) }
+    var initialQueryConsumed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(
+      llmChatUiState.isResettingSession,
+      modelInitStatus?.status,
+      selectedModel.name,
+      myData.initialQuery,
+    ) {
+      if (
+        !myData.initialQuery.isNullOrEmpty() &&
+        !initialQueryConsumed &&
+        modelInitStatus?.status == ModelInitializationStatusType.INITIALIZED &&
+        !llmChatUiState.isResettingSession
+      ) {
+        initialQueryConsumed = true
+        sendMessageTrigger =
+          SendMessageTrigger(
+            model = selectedModel,
+            messages =
+              listOf(
+                ChatMessageText(
+                  content = myData.initialQuery,
+                  side = ChatSide.USER,
+                )
+              ),
+          )
+      }
+    }
+
     LlmChatScreen(
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
@@ -144,6 +186,7 @@ class LlmChatTask @Inject constructor() : CustomTask {
           }
         }
       },
+      sendMessageTrigger = sendMessageTrigger,
     )
   }
 }
@@ -212,6 +255,41 @@ class LlmAskImageTask @Inject constructor() : CustomTask {
     LaunchedEffect(task) { viewModel.loadSystemPrompt(task) }
     val uiSystemPrompt by viewModel.uiSystemPrompt.collectAsState()
     val systemPromptUpdatedMessage = stringResource(R.string.system_prompt_updated)
+
+    val modelManagerUiState by myData.modelManagerViewModel.uiState.collectAsState()
+    val selectedModel = modelManagerUiState.selectedModel
+    val modelInitStatus = modelManagerUiState.modelInitializationStatus[selectedModel.name]
+    val llmChatUiState by viewModel.uiState.collectAsState()
+    var sendMessageTrigger by remember { mutableStateOf<SendMessageTrigger?>(null) }
+    var initialQueryConsumed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(
+      llmChatUiState.isResettingSession,
+      modelInitStatus?.status,
+      selectedModel.name,
+      myData.initialQuery,
+    ) {
+      if (
+        !myData.initialQuery.isNullOrEmpty() &&
+        !initialQueryConsumed &&
+        modelInitStatus?.status == ModelInitializationStatusType.INITIALIZED &&
+        !llmChatUiState.isResettingSession
+      ) {
+        initialQueryConsumed = true
+        sendMessageTrigger =
+          SendMessageTrigger(
+            model = selectedModel,
+            messages =
+              listOf(
+                ChatMessageText(
+                  content = myData.initialQuery,
+                  side = ChatSide.USER,
+                )
+              ),
+          )
+      }
+    }
+
     LlmAskImageScreen(
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
@@ -227,6 +305,7 @@ class LlmAskImageTask @Inject constructor() : CustomTask {
           systemPromptUpdatedMessage = systemPromptUpdatedMessage,
         )
       },
+      sendMessageTrigger = sendMessageTrigger,
     )
   }
 }
@@ -296,6 +375,41 @@ class LlmAskAudioTask @Inject constructor() : CustomTask {
     LaunchedEffect(task) { viewModel.loadSystemPrompt(task) }
     val uiSystemPrompt by viewModel.uiSystemPrompt.collectAsState()
     val systemPromptUpdatedMessage = stringResource(R.string.system_prompt_updated)
+
+    val modelManagerUiState by myData.modelManagerViewModel.uiState.collectAsState()
+    val selectedModel = modelManagerUiState.selectedModel
+    val modelInitStatus = modelManagerUiState.modelInitializationStatus[selectedModel.name]
+    val llmChatUiState by viewModel.uiState.collectAsState()
+    var sendMessageTrigger by remember { mutableStateOf<SendMessageTrigger?>(null) }
+    var initialQueryConsumed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(
+      llmChatUiState.isResettingSession,
+      modelInitStatus?.status,
+      selectedModel.name,
+      myData.initialQuery,
+    ) {
+      if (
+        !myData.initialQuery.isNullOrEmpty() &&
+        !initialQueryConsumed &&
+        modelInitStatus?.status == ModelInitializationStatusType.INITIALIZED &&
+        !llmChatUiState.isResettingSession
+      ) {
+        initialQueryConsumed = true
+        sendMessageTrigger =
+          SendMessageTrigger(
+            model = selectedModel,
+            messages =
+              listOf(
+                ChatMessageText(
+                  content = myData.initialQuery,
+                  side = ChatSide.USER,
+                )
+              ),
+          )
+      }
+    }
+
     LlmAskAudioScreen(
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
@@ -311,6 +425,7 @@ class LlmAskAudioTask @Inject constructor() : CustomTask {
           systemPromptUpdatedMessage = systemPromptUpdatedMessage,
         )
       },
+      sendMessageTrigger = sendMessageTrigger,
     )
   }
 }

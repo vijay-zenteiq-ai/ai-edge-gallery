@@ -63,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -73,7 +74,6 @@ import com.google.ai.edge.gallery.notifications.NotificationScheduleManager
 import com.google.ai.edge.gallery.proto.ScheduledNotification
 import com.google.ai.edge.gallery.ui.theme.customColors
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
@@ -98,7 +98,7 @@ fun NotificationsScreen(
   var notificationToDelete by remember { mutableStateOf<ScheduledNotification?>(null) }
 
   val groupedNotifications by
-    remember(notifications) { derivedStateOf { notifications.groupBy { it.channelName } } }
+  remember(notifications) { derivedStateOf { notifications.groupBy { it.channelName } } }
   val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
 
   Scaffold(
@@ -262,7 +262,12 @@ fun NotificationItem(notification: ScheduledNotification, onDeleteClick: () -> U
       ) {
         Column {
           val timeStr =
-            String.format(Locale.getDefault(), "%02d:%02d", notification.hour, notification.minute)
+            String.format(
+              LocalConfiguration.current.locales[0],
+              "%02d:%02d",
+              notification.hour,
+              notification.minute,
+            )
           Text(
             text = stringResource(R.string.notifications_time_label, timeStr),
             style = MaterialTheme.typography.labelMedium,
@@ -270,9 +275,9 @@ fun NotificationItem(notification: ScheduledNotification, onDeleteClick: () -> U
           )
           if (
             !notification.repeatDaily &&
-              notification.hasYear() &&
-              notification.hasMonth() &&
-              notification.hasDay()
+            notification.hasYear() &&
+            notification.hasMonth() &&
+            notification.hasDay()
           ) {
             Spacer(modifier = Modifier.height(4.dp))
             val dateStr = "${notification.year}/${notification.month}/${notification.day}"

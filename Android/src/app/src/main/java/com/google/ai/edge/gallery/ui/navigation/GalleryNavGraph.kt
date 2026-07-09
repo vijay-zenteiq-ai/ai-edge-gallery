@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -82,12 +82,12 @@ import com.google.ai.edge.gallery.ui.common.ErrorDialog
 import com.google.ai.edge.gallery.ui.common.ModelPageAppBar
 import com.google.ai.edge.gallery.ui.common.chat.ModelDownloadStatusInfoPanel
 import com.google.ai.edge.gallery.ui.home.HomeScreen
-import com.google.ai.edge.gallery.ui.home.PromoScreenGm4
 import com.google.ai.edge.gallery.ui.modelmanager.GlobalModelManager
 import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManager
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.notifications.NotificationsScreen
+import com.google.ai.edge.gallery.ui.promptlibrary.PromptLibraryScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -99,6 +99,8 @@ private const val ROUTE_MODEL = "route_model"
 private const val ROUTE_BENCHMARK = "benchmark"
 private const val ROUTE_MODEL_MANAGER = "model_manager"
 private const val ROUTE_NOTIFICATIONS = "notifications"
+private const val ROUTE_PROMPT_LIBRARY = "prompt_library"
+
 private const val ENTER_ANIMATION_DURATION_MS = 500
 private val ENTER_ANIMATION_EASING = EaseOutExpo
 private const val ENTER_ANIMATION_DELAY_MS = 100
@@ -154,7 +156,6 @@ fun GalleryNavHost(
   modelManagerViewModel: ModelManagerViewModel,
 ) {
   val lifecycleOwner = LocalLifecycleOwner.current
-  var showModelManager by remember { mutableStateOf(false) }
   var pickedTask by remember { mutableStateOf<Task?>(null) }
   var enableHomeScreenAnimation by remember { mutableStateOf(true) }
   var enableModelListAnimation by remember { mutableStateOf(true) }
@@ -192,64 +193,26 @@ fun GalleryNavHost(
   ) {
     // Home screen.
     composable(route = ROUTE_HOMESCREEN) {
-      // Create a state to trigger PromoScreen fade in animation.
-      val promoId = "gm4"
       Box(modifier = modifier.fillMaxSize()) {
-        var promoDismissed by remember { mutableStateOf(false) }
-
-        val homeScreenContent: @Composable () -> Unit = {
-          HomeScreen(
-            modelManagerViewModel = modelManagerViewModel,
-            tosViewModel = hiltViewModel(),
-            enableAnimation = enableHomeScreenAnimation,
-            navigateToTaskScreen = { task ->
-              pickedTask = task
-              enableModelListAnimation = true
-              navController.navigate(ROUTE_MODEL_LIST)
-              firebaseAnalytics?.logEvent(
-                GalleryEvent.CAPABILITY_SELECT.id,
-                Bundle().apply { putString("capability_name", task.id) },
-              )
-            },
-            onModelsClicked = { navController.navigate(ROUTE_MODEL_MANAGER) },
-            onNotificationsClicked = { navController.navigate(ROUTE_NOTIFICATIONS) },
-            gm4 = true,
-          )
-        }
-
-        // Show home page directly if promo has been viewed.
-        if (modelManagerViewModel.dataStoreRepository.hasViewedPromo(promoId = promoId)) {
-          homeScreenContent()
-        }
-        // If the promo has not been viewed, show promo screen first.
-        else {
-          AnimatedContent(
-            targetState = promoDismissed,
-            label = "PromoToHome",
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-          ) { dismissed ->
-            if (dismissed) {
-              homeScreenContent()
-            } else {
-              var startAnimation by remember { mutableStateOf(false) }
-              LaunchedEffect(Unit) {
-                delay(0L)
-                startAnimation = true
-              }
-              AnimatedVisibility(
-                visible = startAnimation,
-                enter = scaleIn(initialScale = 1.05f, animationSpec = tween(durationMillis = 1000)),
-              ) {
-                PromoScreenGm4(
-                  onDismiss = {
-                    modelManagerViewModel.dataStoreRepository.addViewedPromoId(promoId = promoId)
-                    promoDismissed = true
-                  }
-                )
-              }
-            }
-          }
-        }
+        // FIXED: Promo animation checking is completely removed to prevent initial blank layout block
+        HomeScreen(
+          modelManagerViewModel = modelManagerViewModel,
+          tosViewModel = hiltViewModel(),
+          enableAnimation = enableHomeScreenAnimation,
+          navigateToTaskScreen = { task ->
+            pickedTask = task
+            enableModelListAnimation = true
+            navController.navigate(ROUTE_MODEL_LIST)
+            firebaseAnalytics?.logEvent(
+              GalleryEvent.CAPABILITY_SELECT.id,
+              Bundle().apply { putString("capability_name", task.id) },
+            )
+          },
+          onModelsClicked = { navController.navigate(ROUTE_MODEL_MANAGER) },
+          onNotificationsClicked = { navController.navigate(ROUTE_NOTIFICATIONS) },
+          onPromptsClicked = { navController.navigate(ROUTE_PROMPT_LIBRARY) },
+          gm4 = true,
+        )
       }
     }
 
@@ -352,7 +315,6 @@ fun GalleryNavHost(
                   lastNavigatedModelName = ""
                   navController.navigateUp()
 
-                  // clean up all models.
                   for (curModel in customTask.task.models) {
                     val instanceToCleanUp = curModel.instance
                     scope.launch(Dispatchers.Default) {
@@ -392,7 +354,7 @@ fun GalleryNavHost(
       enterTransition = {
         if (
           initialState.destination.route?.startsWith(ROUTE_BENCHMARK) == true ||
-            initialState.destination.route?.startsWith(ROUTE_MODEL) == true
+          initialState.destination.route?.startsWith(ROUTE_MODEL) == true
         ) {
           null
         } else {
@@ -402,14 +364,14 @@ fun GalleryNavHost(
       exitTransition = {
         if (
           targetState.destination.route?.startsWith(ROUTE_BENCHMARK) == true ||
-            targetState.destination.route?.startsWith(ROUTE_MODEL) == true
+          targetState.destination.route?.startsWith(ROUTE_MODEL) == true
         ) {
           null
         } else {
           slideDownExit()
         }
       },
-    ) { backStackEntry ->
+    ) {
       GlobalModelManager(
         viewModel = modelManagerViewModel,
         navigateUp = {
@@ -438,6 +400,15 @@ fun GalleryNavHost(
       NotificationsScreen(navigateUp = { navController.navigateUp() })
     }
 
+    // Prompt Library page
+    composable(
+      route = ROUTE_PROMPT_LIBRARY,
+      enterTransition = { slideUpEnter() },
+      exitTransition = { slideDownExit() },
+    ) {
+      PromptLibraryScreen(navigateUp = { navController.navigateUp() })
+    }
+
     // Benchmark creation page.
     composable(
       route = "$ROUTE_BENCHMARK/{modelName}",
@@ -463,12 +434,10 @@ fun GalleryNavHost(
   // Handle incoming intents for deep links
   val intent = androidx.activity.compose.LocalActivity.current?.intent
   val data = intent?.data
-  // Wait until the model manager has been initialized and the tasks are available.
   if (data != null && modelManagerUiState.tasks.isNotEmpty()) {
     intent.data = null
     val uriStr = data.toString()
     Log.d(TAG, "navigation link clicked: $data")
-    // 1. Precise model deep links: com.google.ai.edge.gallery://model/<taskId>/<modelName>
     if (uriStr.startsWith("com.google.ai.edge.gallery://model/")) {
       if (data.pathSegments.size >= 2) {
         val taskId = data.pathSegments.get(data.pathSegments.size - 2)
@@ -489,17 +458,15 @@ fun GalleryNavHost(
     } else if (uriStr == "com.google.ai.edge.gallery://global_model_manager") {
       navController.navigate(ROUTE_MODEL_MANAGER)
     } else {
-      // 2. Dynamic task-level deep links: com.google.ai.edge.gallery://<taskId>
       val host = data.host
       if (host != null) {
         val queryStr = data.getQueryParameter("query")
         val task = modelManagerUiState.tasks.find { it.id == host }
         if (task != null) {
-          // Pick the first successfully downloaded model or the default active model for this task
           val defaultModel =
             task.models.firstOrNull { model ->
               modelManagerUiState.modelDownloadStatus[model.name]?.status ==
-                ModelDownloadStatusType.SUCCEEDED
+                      ModelDownloadStatusType.SUCCEEDED
             } ?: task.models.firstOrNull()
 
           if (defaultModel != null) {
@@ -542,10 +509,8 @@ private fun CustomTaskScreen(
     onNavigateUp()
   }
 
-  // Handle system's edge swipe.
   BackHandler { handleNavigateUp() }
 
-  // Initialize model when model/download state changes.
   val curDownloadStatus = modelManagerUiState.modelDownloadStatus[selectedModel.name]
   LaunchedEffect(curDownloadStatus, selectedModel.name) {
     if (!navigatingUp) {
@@ -587,7 +552,6 @@ private fun CustomTaskScreen(
           onModelSelected = { prevModel, newSelectedModel ->
             val instanceToCleanUp = prevModel.instance
             scope.launch(Dispatchers.Default) {
-              // Clean up prev model.
               if (prevModel.name != newSelectedModel.name) {
                 modelManagerViewModel.cleanupModel(
                   context = context,
@@ -596,8 +560,6 @@ private fun CustomTaskScreen(
                   instanceToCleanUp = instanceToCleanUp,
                 )
               }
-
-              // Update selected model.
               Log.d(TAG, "from model picker. new: ${newSelectedModel.name}")
               modelManagerViewModel.selectModel(model = newSelectedModel)
             }
@@ -606,22 +568,19 @@ private fun CustomTaskScreen(
       }
     }
   ) { innerPadding ->
-    // Calculate the target height in Dp for the content's top padding.
     val targetPaddingDp =
       if (!hideTopBar && appBarHeight > 0) {
-        // Convert measured pixel height to Dp
         with(LocalDensity.current) { appBarHeight.toDp() }
       } else {
         WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
       }
 
-    // Animate the actual top padding value.
     val animatedTopPadding by
-      animateDpAsState(
-        targetValue = targetPaddingDp,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "TopPaddingAnimation",
-      )
+    animateDpAsState(
+      targetValue = targetPaddingDp,
+      animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+      label = "TopPaddingAnimation",
+    )
 
     Box(
       modifier =
@@ -636,9 +595,7 @@ private fun CustomTaskScreen(
         targetState = curModelDownloadStatus?.status == ModelDownloadStatusType.SUCCEEDED
       ) { targetState ->
         when (targetState) {
-          // Main UI when model is downloaded.
           true -> content(innerPadding.calculateBottomPadding())
-          // Model download
           false ->
             ModelDownloadStatusInfoPanel(
               model = selectedModel,

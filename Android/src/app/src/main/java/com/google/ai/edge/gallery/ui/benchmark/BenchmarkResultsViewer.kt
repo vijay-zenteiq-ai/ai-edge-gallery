@@ -145,7 +145,7 @@ fun BenchmarkResultsViewer(
     filteredResults.addAll(
       uiState.results.filter {
         selectedModelName == strAll ||
-          it.benchmarkResult.llmResult?.baiscInfo?.modelName == selectedModelName
+                it.benchmarkResult.llmResult?.baiscInfo?.modelName == selectedModelName
       }
     )
   }
@@ -230,7 +230,7 @@ fun BenchmarkResultsViewer(
           // Running.
           if (targetState) {
             scaleIn(initialScale = 0.8f) + fadeIn() togetherWith
-              scaleOut(targetScale = 0.8f) + fadeOut()
+                    scaleOut(targetScale = 0.8f) + fadeOut()
           }
           // Results.
           else {
@@ -334,8 +334,8 @@ fun BenchmarkResultsViewer(
                     }
                   }
                   itemsIndexed(items = filteredResults, key = { index, item -> item.id }) {
-                    index,
-                    result ->
+                      index,
+                      result ->
                     // Result card.
                     var cardModifier = Modifier.clip(RoundedCornerShape(20.dp)).fillMaxWidth()
                     if (showLazyListPlacementAnimation) {
@@ -880,20 +880,20 @@ private fun ValueSeriesRow(
         val textModifier =
           if (isMultipleRuns) {
             Modifier.drawBehind {
-                val strokeWidth = 2f
-                val y = size.height - strokeWidth
+              val strokeWidth = 2f
+              val y = size.height - strokeWidth
 
-                // Define the dash pattern: 8px line, 8px gap
-                val dashPath = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+              // Define the dash pattern: 8px line, 8px gap
+              val dashPath = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
 
-                drawLine(
-                  color = linkColor,
-                  start = Offset(0f, y),
-                  end = Offset(size.width, y),
-                  strokeWidth = strokeWidth,
-                  pathEffect = dashPath,
-                )
-              }
+              drawLine(
+                color = linkColor,
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = strokeWidth,
+                pathEffect = dashPath,
+              )
+            }
               .clickable { showValueSeriesBottomSheet = true }
           } else {
             Modifier
@@ -953,38 +953,38 @@ private fun getBenchmarkResultCsv(llmResult: LlmBenchmarkResult, aggregation: Ag
 
   val header =
     listOf(
-        "start time (ms)",
-        "end time (ms)",
-        "model name",
-        "accelerator",
-        "prefill tokens count",
-        "decode tokens count",
-        "runs count",
-        "app version",
-        "prefill speed (tokens/sec)",
-        "decode speed (tokens/sec)",
-        "time to first token (sec)",
-        "first init time (ms)",
-        "steady init time (ms)",
-      )
+      "start time (ms)",
+      "end time (ms)",
+      "model name",
+      "accelerator",
+      "prefill tokens count",
+      "decode tokens count",
+      "runs count",
+      "app version",
+      "prefill speed (tokens/sec)",
+      "decode speed (tokens/sec)",
+      "time to first token (sec)",
+      "first init time (ms)",
+      "steady init time (ms)",
+    )
       .joinToString(",")
 
   val data =
     listOf(
-        basicInfo.startMs,
-        basicInfo.endMs,
-        basicInfo.modelName,
-        basicInfo.accelerator,
-        basicInfo.prefillTokens,
-        basicInfo.decodeTokens,
-        basicInfo.numberOfRuns,
-        basicInfo.appVersion,
-        getAggregationValue(stats.prefillSpeed, aggregation),
-        getAggregationValue(stats.decodeSpeed, aggregation),
-        getAggregationValue(stats.timeToFirstToken, aggregation),
-        stats.firstInitTimeMs,
-        getAggregationValue(stats.nonFirstInitTimeMs, aggregation),
-      )
+      basicInfo.startMs,
+      basicInfo.endMs,
+      basicInfo.modelName,
+      basicInfo.accelerator,
+      basicInfo.prefillTokens,
+      basicInfo.decodeTokens,
+      basicInfo.numberOfRuns,
+      basicInfo.appVersion,
+      getAggregationValue(stats.prefillSpeed, aggregation),
+      getAggregationValue(stats.decodeSpeed, aggregation),
+      getAggregationValue(stats.timeToFirstToken, aggregation),
+      stats.firstInitTimeMs,
+      getAggregationValue(stats.nonFirstInitTimeMs, aggregation),
+    )
       .joinToString(",")
 
   return "$header\n$data"
