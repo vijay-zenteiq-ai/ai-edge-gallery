@@ -81,6 +81,7 @@ class LlmChatTask @Inject constructor() : CustomTask {
       sourceCodeUrl =
         "https://github.com/google-ai-edge/gallery/blob/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatModelHelper.kt",
       textInputPlaceHolderRes = R.string.text_input_placeholder_llm_chat,
+      defaultSystemPrompt = "You are a helpful assistant. Please keep your responses concise and around 150 words.",
     )
 
   override fun initializeModelFn(
@@ -218,6 +219,7 @@ class LlmAskImageTask @Inject constructor() : CustomTask {
       sourceCodeUrl =
         "https://github.com/google-ai-edge/gallery/blob/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatModelHelper.kt",
       textInputPlaceHolderRes = R.string.text_input_placeholder_llm_chat,
+      defaultSystemPrompt = "You are a helpful assistant. Please describe the image concisely in around 150 words.",
     )
 
   override fun initializeModelFn(
@@ -338,6 +340,7 @@ class LlmAskAudioTask @Inject constructor() : CustomTask {
       sourceCodeUrl =
         "https://github.com/google-ai-edge/gallery/blob/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatModelHelper.kt",
       textInputPlaceHolderRes = R.string.text_input_placeholder_llm_chat,
+      defaultSystemPrompt = "You are a helpful assistant. Please transcribe and summarize the audio concisely in around 150 words.",
     )
 
   override fun initializeModelFn(

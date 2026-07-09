@@ -126,58 +126,109 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
 
           // Download them in sequence.
           // TODO: maybe consider downloading them in parallel.
-          var downloadedBytes = 0L
+          var completedFilesBytes = 0L
           val bytesReadSizeBuffer: MutableList<Long> = mutableListOf()
           val bytesReadLatencyBuffer: MutableList<Long> = mutableListOf()
           for (file in allFiles) {
-            val url = URL(file.url)
+            var connection: HttpURLConnection? = null
+            var lastException: IOException? = null
 
-            val connection = url.openConnection() as HttpURLConnection
-            if (accessToken != null) {
-              Log.d(TAG, "Using access token: ${accessToken.subSequence(0, 10)}...")
-              connection.setRequestProperty("Authorization", "Bearer $accessToken")
-            }
+            val baseDir =
+              applicationContext.getExternalFilesDir(null)
+                ?: throw IOException("External storage is not available")
 
-            // Prepare output file's dir.
-            val outputDir =
-              if (isModelImported) {
-                File(applicationContext.getExternalFilesDir(null), modelDir)
-              } else {
-                File(
-                  applicationContext.getExternalFilesDir(null),
-                  listOf(modelDir, version).joinToString(separator = File.separator),
-                )
-              }
+            val modelFolder = File(baseDir, modelDir)
+            val outputDir = if (isModelImported) modelFolder else File(modelFolder, version)
+
             if (!outputDir.exists()) {
-              outputDir.mkdirs()
+              val created = outputDir.mkdirs()
+              Log.d(TAG, "Creating directory ${outputDir.absolutePath}. Success: $created")
             }
 
-            // Read the tmp file and see if it is partially downloaded.
-            val outputTmpFile =
-              if (isModelImported) {
-                File(
-                  applicationContext.getExternalFilesDir(null),
-                  listOf(modelDir, "${file.fileName}.$TMP_FILE_EXT")
-                    .joinToString(separator = File.separator),
-                )
-              } else {
-                File(
-                  applicationContext.getExternalFilesDir(null),
-                  listOf(modelDir, version, "${file.fileName}.$TMP_FILE_EXT")
-                    .joinToString(separator = File.separator),
-                )
-              }
-            val outputFileBytes = outputTmpFile.length()
-            if (outputFileBytes > 0) {
-              Log.d(
-                TAG,
-                "File '${outputTmpFile.name}' partial size: ${outputFileBytes}. Trying to resume download",
-              )
-              connection.setRequestProperty("Range", "bytes=${outputFileBytes}-")
-              // Force the server to send non-compressed data to make download resuming work.
-              connection.setRequestProperty("Accept-Encoding", "identity")
+            val originalFilePath =
+              File(outputDir, file.fileName).absolutePath.replace(".$TMP_FILE_EXT", "")
+            val originalFile = File(originalFilePath)
+
+            // If the file is already fully downloaded, skip it.
+            if (originalFile.exists()) {
+              Log.d(TAG, "File ${file.fileName} already exists. Skipping.")
+              completedFilesBytes += originalFile.length()
+              continue
             }
-            connection.connect()
+
+            val outputTmpFile = File(outputDir, "${file.fileName}.$TMP_FILE_EXT")
+            val outputFileBytes = outputTmpFile.length()
+
+            val hostsToTry =
+              if (file.url.contains("huggingface.co")) {
+                listOf("huggingface.co", "modelscope.cn")
+              } else {
+                listOf(null)
+              }
+
+            fun setupConnection(conn: HttpURLConnection, urlString: String) {
+              // Standard browser headers for public downloads
+              conn.setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              )
+              conn.setRequestProperty("Accept", "*/*")
+              conn.setRequestProperty("Connection", "keep-alive")
+              conn.connectTimeout = 30000
+              conn.readTimeout = 30000
+              if (accessToken != null && urlString.contains("huggingface.co")) {
+                conn.setRequestProperty("Authorization", "Bearer $accessToken")
+              }
+            }
+
+            var currentFileDownloadedBytes: Long
+            for (host in hostsToTry) {
+              try {
+                var urlString = file.url
+                if (host == "modelscope.cn") {
+                  val hfRegex =
+                    Regex("https://huggingface.co/(.+)/resolve/([^/]+)/(.+)\\?download=true")
+                  val match = hfRegex.find(file.url)
+                  if (match != null) {
+                    val modelId = match.groupValues[1]
+                    val commitHash = match.groupValues[2]
+                    val modelFile = match.groupValues[3]
+                    urlString =
+                      "https://modelscope.cn/api/v1/models/$modelId/repo?Revision=$commitHash&FilePath=$modelFile"
+                  } else {
+                    urlString = file.url.replace("huggingface.co", host)
+                  }
+                } else if (host != null) {
+                  urlString = file.url.replace("huggingface.co", host)
+                }
+
+                Log.d(TAG, "Trying to connect to: $urlString")
+                val url = URL(urlString)
+                val conn = url.openConnection() as HttpURLConnection
+                setupConnection(conn, urlString)
+
+                if (outputFileBytes > 0) {
+                  Log.d(
+                    TAG,
+                    "File '${outputTmpFile.name}' partial size: ${outputFileBytes}. Trying to resume download",
+                  )
+                  conn.setRequestProperty("Range", "bytes=${outputFileBytes}-")
+                  // Force the server to send non-compressed data to make download resuming work.
+                  conn.setRequestProperty("Accept-Encoding", "identity")
+                }
+
+                conn.connect()
+                connection = conn
+                break
+              } catch (e: IOException) {
+                Log.w(TAG, "Connection attempt failed for host $host: ${e.message}")
+                lastException = e
+              }
+            }
+
+            if (connection == null) {
+              throw lastException ?: IOException("Failed to connect to any host")
+            }
             Log.d(TAG, "response code: ${connection.responseCode}")
 
             if (
@@ -198,9 +249,10 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
                   "Content-Range: $contentRange. Start bytes: ${startByte}, end bytes: $endByte",
                 )
 
-                downloadedBytes += startByte
+                currentFileDownloadedBytes = startByte
               } else {
                 Log.d(TAG, "Download starts from beginning.")
+                currentFileDownloadedBytes = 0
               }
             } else {
               throw IOException("HTTP error code: ${connection.responseCode}")
@@ -215,8 +267,10 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
             var deltaBytes = 0L
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
               outputStream.write(buffer, 0, bytesRead)
-              downloadedBytes += bytesRead
+              currentFileDownloadedBytes += bytesRead
               deltaBytes += bytesRead
+
+              val downloadedBytes = completedFilesBytes + currentFileDownloadedBytes
 
               // Report progress every 200 ms.
               val curTs = System.currentTimeMillis()
@@ -251,7 +305,8 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
                 )
                 setForeground(
                   createForegroundInfo(
-                    progress = (downloadedBytes * 100 / totalBytes).toInt(),
+                    progress =
+                      if (totalBytes > 0) (downloadedBytes * 100 / totalBytes).toInt() else 0,
                     modelName = modelName,
                   )
                 )
@@ -264,12 +319,11 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
             inputStream.close()
 
             // Rename the tmp file to the original file name by removing the tmp file ext.
-            val originalFilePath = outputTmpFile.absolutePath.replace(".$TMP_FILE_EXT", "")
-            val originalFile = File(originalFilePath)
             if (originalFile.exists()) {
               originalFile.delete()
             }
             outputTmpFile.renameTo(originalFile)
+            completedFilesBytes += originalFile.length()
             Log.d(TAG, "Download done")
 
             // Unzip if the downloaded file is a zip.
@@ -326,8 +380,13 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
           Result.success()
         } catch (e: IOException) {
           Log.e(TAG, e.message, e)
+          var errorMessage = e.message ?: "Unknown error"
+          if (errorMessage.contains("Unable to resolve host \"huggingface.co\"")) {
+            errorMessage =
+              "Unable to resolve Hugging Face. Please check your internet connection or use a mirror."
+          }
           Result.failure(
-            Data.Builder().putString(KEY_MODEL_DOWNLOAD_ERROR_MESSAGE, e.message).build()
+            Data.Builder().putString(KEY_MODEL_DOWNLOAD_ERROR_MESSAGE, errorMessage).build()
           )
         }
       }

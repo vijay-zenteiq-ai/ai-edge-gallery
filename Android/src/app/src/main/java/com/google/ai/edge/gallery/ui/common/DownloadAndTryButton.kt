@@ -159,6 +159,12 @@ fun DownloadAndTryButton(
   val showDownloadProgress =
     !downloadSucceeded && (downloadStarted || checkingToken || inProgress || isPartiallyDownloaded)
 
+  LaunchedEffect(downloadStatus) {
+    if (downloadStatus == ModelDownloadStatusType.FAILED || downloadStatus == ModelDownloadStatusType.SUCCEEDED) {
+      downloadStarted = false
+    }
+  }
+
   // A launcher for requesting notification permission.
   val permissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
