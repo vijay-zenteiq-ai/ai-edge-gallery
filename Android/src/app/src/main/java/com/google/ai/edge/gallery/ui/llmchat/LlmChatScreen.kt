@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ private const val TAG = "AGLlmChatScreen"
 fun LlmChatScreen(
   modelManagerViewModel: ModelManagerViewModel,
   navigateUp: () -> Unit,
+  onPromptLibraryClicked: () -> Unit, // Added to handle prompt template actions
   modifier: Modifier = Modifier,
   taskId: String = BuiltInTaskId.LLM_CHAT,
   onFirstToken: (Model) -> Unit = {},
@@ -78,6 +79,7 @@ fun LlmChatScreen(
   onSystemPromptChanged: (String) -> Unit = {},
   emptyStateComposable: @Composable (Model) -> Unit = {},
   sendMessageTrigger: SendMessageTrigger? = null,
+  promptToInput: String? = null,
   showImagePicker: Boolean = false,
   showAudioPicker: Boolean = false,
   getActiveSkills: () -> List<String> = { emptyList() },
@@ -90,6 +92,7 @@ fun LlmChatScreen(
     modelManagerViewModel = modelManagerViewModel,
     taskId = taskId,
     navigateUp = navigateUp,
+    onPromptLibraryClicked = onPromptLibraryClicked,
     modifier = modifier,
     onSkillClicked = onSkillClicked,
     onMcpClicked = onMcpClicked,
@@ -105,6 +108,7 @@ fun LlmChatScreen(
     onSystemPromptChanged = onSystemPromptChanged,
     emptyStateComposable = emptyStateComposable,
     sendMessageTrigger = sendMessageTrigger,
+    promptToInput = promptToInput,
     showImagePicker = showImagePicker,
     showAudioPicker = showAudioPicker,
     getActiveSkills = getActiveSkills,
@@ -115,23 +119,27 @@ fun LlmChatScreen(
 fun LlmAskImageScreen(
   modelManagerViewModel: ModelManagerViewModel,
   navigateUp: () -> Unit,
+  onPromptLibraryClicked: () -> Unit, // Added to handle prompt template actions
   modifier: Modifier = Modifier,
   viewModel: LlmAskImageViewModel = hiltViewModel(),
   allowEditingSystemPrompt: Boolean = false,
   curSystemPrompt: String = "",
   onSystemPromptChanged: (String) -> Unit = {},
   sendMessageTrigger: SendMessageTrigger? = null,
+  promptToInput: String? = null,
 ) {
   ChatViewWrapper(
     viewModel = viewModel,
     modelManagerViewModel = modelManagerViewModel,
     taskId = BuiltInTaskId.LLM_ASK_IMAGE,
     navigateUp = navigateUp,
+    onPromptLibraryClicked = onPromptLibraryClicked,
     modifier = modifier,
     allowEditingSystemPrompt = allowEditingSystemPrompt,
     curSystemPrompt = curSystemPrompt,
     onSystemPromptChanged = onSystemPromptChanged,
     sendMessageTrigger = sendMessageTrigger,
+    promptToInput = promptToInput,
     showImagePicker = true,
     showAudioPicker = false,
     emptyStateComposable = { model ->
@@ -165,23 +173,27 @@ fun LlmAskImageScreen(
 fun LlmAskAudioScreen(
   modelManagerViewModel: ModelManagerViewModel,
   navigateUp: () -> Unit,
+  onPromptLibraryClicked: () -> Unit, // Added to handle prompt template actions
   modifier: Modifier = Modifier,
   viewModel: LlmAskAudioViewModel = hiltViewModel(),
   allowEditingSystemPrompt: Boolean = false,
   curSystemPrompt: String = "",
   onSystemPromptChanged: (String) -> Unit = {},
   sendMessageTrigger: SendMessageTrigger? = null,
+  promptToInput: String? = null,
 ) {
   ChatViewWrapper(
     viewModel = viewModel,
     modelManagerViewModel = modelManagerViewModel,
     taskId = BuiltInTaskId.LLM_ASK_AUDIO,
     navigateUp = navigateUp,
+    onPromptLibraryClicked = onPromptLibraryClicked,
     modifier = modifier,
     allowEditingSystemPrompt = allowEditingSystemPrompt,
     curSystemPrompt = curSystemPrompt,
     onSystemPromptChanged = onSystemPromptChanged,
     sendMessageTrigger = sendMessageTrigger,
+    promptToInput = promptToInput,
     showImagePicker = false,
     showAudioPicker = true,
     emptyStateComposable = {
@@ -211,6 +223,7 @@ fun ChatViewWrapper(
   modelManagerViewModel: ModelManagerViewModel,
   taskId: String,
   navigateUp: () -> Unit,
+  onPromptLibraryClicked: () -> Unit, // Forward action into ChatView setup
   modifier: Modifier = Modifier,
   onSkillClicked: () -> Unit = {},
   onMcpClicked: () -> Unit = {},
@@ -224,6 +237,7 @@ fun ChatViewWrapper(
   curSystemPrompt: String = "",
   onSystemPromptChanged: (String) -> Unit = {},
   sendMessageTrigger: SendMessageTrigger? = null,
+  promptToInput: String? = null,
   showImagePicker: Boolean = false,
   showAudioPicker: Boolean = false,
   getActiveSkills: () -> List<String> = { emptyList() },
@@ -343,6 +357,7 @@ fun ChatViewWrapper(
     onStopButtonClicked = { model -> viewModel.stopResponse(model = model) },
     onSkillClicked = onSkillClicked,
     onMcpClicked = onMcpClicked,
+    onPromptLibraryClicked = onPromptLibraryClicked, // Injected parameter connection here
     navigateUp = navigateUp,
     skillCount = skillCount,
     mcpCount = mcpCount,
@@ -354,20 +369,17 @@ fun ChatViewWrapper(
     curSystemPrompt = curSystemPrompt,
     onSystemPromptChanged = onSystemPromptChanged,
     sendMessageTrigger = sendMessageTrigger,
+    promptToInput = promptToInput,
     showAudioPicker = showAudioPicker,
   )
 }
 
 private fun convertToLitertMessage(chatMessage: ChatMessage): Message? {
-  // TODO: Restore image and audio messages to the LLM context.
-  // We are currently bypassing them because the image and audio encoder may take
-  // too long during chat history loading, which can cause stalls or stream errors.
   if (chatMessage is ChatMessageText) {
     return when (chatMessage.side) {
       ChatSide.USER -> Message.user(chatMessage.content)
       ChatSide.AGENT -> Message.model(chatMessage.content)
-      ChatSide.SYSTEM ->
-        null // TODO: Support SYSTEM role once we can decide on which system prompt to use.
+      ChatSide.SYSTEM -> null
     }
   }
   return null

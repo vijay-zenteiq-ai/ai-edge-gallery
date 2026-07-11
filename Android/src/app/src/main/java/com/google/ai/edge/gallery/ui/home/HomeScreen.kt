@@ -224,6 +224,7 @@ fun HomeScreen(
     // This effect runs whenever uiState.loadingModelAllowlist changes
     LaunchedEffect(uiState.loadingModelAllowlist) {
       if (uiState.loadingModelAllowlist) {
+        delay(200)
         loadingModelAllowlistDelayed = true
       } else {
         // If loading finishes, immediately hide the indicator
@@ -231,24 +232,6 @@ fun HomeScreen(
       }
     }
 
-    // Label and spinner to show when in the process of loading model allowlist.
-    if (loadingModelAllowlistDelayed) {
-      Row(
-        modifier = Modifier.fillMaxSize(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-      ) {
-        CircularProgressIndicator(
-          trackColor = MaterialTheme.colorScheme.surfaceVariant,
-          strokeWidth = 3.dp,
-          modifier = Modifier.padding(end = 8.dp).size(20.dp),
-        )
-        Text(
-          stringResource(R.string.loading_model_list),
-          style = MaterialTheme.typography.bodyMedium,
-        )
-      }
-    }
     // Main UI when allowlist is done loading.
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 

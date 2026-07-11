@@ -911,12 +911,18 @@ constructor(
         _allowlistModels.clear()
 
         // Load model allowlist json.
-        // Try to read the test allowlist first.
-        Log.d(TAG, "Loading test model allowlist.")
-        var modelAllowlist = readModelAllowlistFromDisk(fileName = MODEL_ALLOWLIST_TEST_FILENAME)
+        // Try to read the cached allowlist from disk first for fast startup.
+        Log.d(TAG, "Loading cached model allowlist from disk.")
+        var modelAllowlist = readModelAllowlistFromDisk(fileName = MODEL_ALLOWLIST_FILENAME)
+
+        // If not found, try the test allowlist.
+        if (modelAllowlist == null) {
+          Log.d(TAG, "Loading test model allowlist.")
+          modelAllowlist = readModelAllowlistFromDisk(fileName = MODEL_ALLOWLIST_TEST_FILENAME)
+        }
 
         // Local test only.
-        if (TEST_MODEL_ALLOW_LIST.isNotEmpty()) {
+        if (modelAllowlist == null && TEST_MODEL_ALLOW_LIST.isNotEmpty()) {
           Log.d(TAG, "Loading local model allowlist for testing.")
           val gson = Gson()
           try {
@@ -926,18 +932,15 @@ constructor(
           }
         }
 
+        // Finally, try to load from github if no local version was found.
         if (modelAllowlist == null) {
-          // Load from github.
           var version = BuildConfig.VERSION_NAME.replace(".", "_")
           val url = getAllowlistUrl(version)
           Log.d(TAG, "Loading model allowlist from internet. Url: $url")
           val data = getJsonResponse<ModelAllowlist>(url = url)
           modelAllowlist = data?.jsonObj
 
-          if (modelAllowlist == null) {
-            Log.w(TAG, "Failed to load model allowlist from internet. Trying to load it from disk")
-            modelAllowlist = readModelAllowlistFromDisk()
-          } else {
+          if (modelAllowlist != null) {
             Log.d(TAG, "Done: loading model allowlist from internet")
             saveModelAllowlistToDisk(modelAllowlistContent = data?.textContent ?: "{}")
           }

@@ -18,6 +18,7 @@ package com.google.ai.edge.gallery.ui.promptlibrary
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,7 +47,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.ai.edge.gallery.data.Prompt
 
@@ -54,6 +54,7 @@ import com.google.ai.edge.gallery.data.Prompt
 @Composable
 fun PromptLibraryScreen(
     navigateUp: () -> Unit,
+    onPromptSelected: ((String) -> Unit)? = null,
     viewModel: PromptLibraryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -119,9 +120,7 @@ fun PromptLibraryScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .zIndex(5f), // HARD FORCE: Places search box on top layer
+                    modifier = Modifier.fillMaxWidth(), // CHANGED: Removed .zIndex(5f) layout block constraint
                     placeholder = { Text("Search your prompts...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search bar icon") },
                     shape = RoundedCornerShape(24.dp),
@@ -158,8 +157,7 @@ fun PromptLibraryScreen(
                                 onValueChange = { titleText = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .zIndex(10f), // HARD FORCE: Places input cleanly on touch layers
+                                    .padding(vertical = 4.dp), // CHANGED: Removed .zIndex(10f) layout block constraint
                                 placeholder = { Text("e.g. Python Docstring Gen", color = Color.Gray) },
                                 shape = RoundedCornerShape(8.dp),
                                 singleLine = true
@@ -174,8 +172,7 @@ fun PromptLibraryScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(110.dp)
-                                    .padding(vertical = 4.dp)
-                                    .zIndex(10f),
+                                    .padding(vertical = 4.dp), // CHANGED: Removed .zIndex(10f) layout block constraint
                                 placeholder = { Text("Enter your prompt instructions here...", color = Color.Gray) },
                                 shape = RoundedCornerShape(8.dp)
                             )
@@ -282,7 +279,10 @@ fun PromptLibraryScreen(
                             promptInstructionText = item.text
                             selectedCategory = item.category
                             Toast.makeText(context, "Loaded into editor!", Toast.LENGTH_SHORT).show()
-                        }
+                        },
+                        onSelect = if (onPromptSelected != null) {
+                            { onPromptSelected(item.text) }
+                        } else null
                     )
                 }
             }
@@ -364,10 +364,15 @@ fun PromptItemCard(
     onDelete: () -> Unit,
     onView: () -> Unit,
     onEdit: () -> Unit,
-    onFavoriteToggle: () -> Unit
+    onFavoriteToggle: () -> Unit,
+    onSelect: (() -> Unit)? = null
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onSelect != null) Modifier.clickable { onSelect() } else Modifier
+            ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)

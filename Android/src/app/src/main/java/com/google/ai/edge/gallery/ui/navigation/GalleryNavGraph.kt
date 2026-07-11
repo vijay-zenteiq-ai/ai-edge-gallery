@@ -194,7 +194,7 @@ fun GalleryNavHost(
     // Home screen.
     composable(route = ROUTE_HOMESCREEN) {
       Box(modifier = modifier.fillMaxSize()) {
-        // FIXED: Promo animation checking is completely removed to prevent initial blank layout block
+        // FIXED: Promo animation verification layers completely removed to prevent initial blank frame block bug
         HomeScreen(
           modelManagerViewModel = modelManagerViewModel,
           tosViewModel = hiltViewModel(),
@@ -279,6 +279,9 @@ fun GalleryNavHost(
       val scope = rememberCoroutineScope()
       val context = LocalContext.current
 
+      val selectedPromptState = backStackEntry.savedStateHandle.getStateFlow<String?>("selected_prompt", null).collectAsState()
+      val selectedPrompt = selectedPromptState.value
+
       modelManagerViewModel.getModelByName(name = modelName)?.let { initialModel ->
         if (lastNavigatedModelName != modelName) {
           modelManagerViewModel.selectModel(initialModel)
@@ -297,9 +300,17 @@ fun GalleryNavHost(
                     lastNavigatedModelName = ""
                     navController.navigateUp()
                   },
+                  onPromptLibraryClicked = { navController.navigate(ROUTE_PROMPT_LIBRARY) },
                   initialQuery = queryParam,
+                  selectedPrompt = selectedPrompt,
                 )
             )
+
+            LaunchedEffect(selectedPrompt) {
+              if (selectedPrompt != null) {
+                backStackEntry.savedStateHandle["selected_prompt"] = null
+              }
+            }
           } else {
             var disableAppBarControls by remember { mutableStateOf(false) }
             var hideTopBar by remember { mutableStateOf(false) }
@@ -406,7 +417,13 @@ fun GalleryNavHost(
       enterTransition = { slideUpEnter() },
       exitTransition = { slideDownExit() },
     ) {
-      PromptLibraryScreen(navigateUp = { navController.navigateUp() })
+      PromptLibraryScreen(
+        navigateUp = { navController.navigateUp() },
+        onPromptSelected = { prompt ->
+          navController.previousBackStackEntry?.savedStateHandle?.set("selected_prompt", prompt)
+          navController.navigateUp()
+        }
+      )
     }
 
     // Benchmark creation page.

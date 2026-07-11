@@ -144,6 +144,8 @@ fun ChatPanel(
   onStopButtonClicked: () -> Unit = {},
   onSkillClicked: () -> Unit = {},
   onMcpClicked: () -> Unit = {},
+  onPromptLibraryClicked: () -> Unit = {}, // Connected action callback
+  promptToInput: String? = null,
   onImageSelected: (bitmaps: List<Bitmap>, selectedBitmapIndex: Int) -> Unit = { _, _ -> },
   showStopButtonInInputWhenInProgress: Boolean = false,
   showImagePicker: Boolean = false,
@@ -193,6 +195,12 @@ fun ChatPanel(
   var curMessage by remember { mutableStateOf("") } // Correct state
   val focusManager = LocalFocusManager.current
 
+  LaunchedEffect(promptToInput) {
+    if (promptToInput != null) {
+      curMessage = promptToInput
+    }
+  }
+
   // List state to control scrolling.
   val listState = rememberScrollState()
   val density = LocalDensity.current
@@ -227,9 +235,9 @@ fun ChatPanel(
   var isAtBottom by remember { mutableStateOf(true) }
   LaunchedEffect(listState) {
     snapshotFlow {
-        // Read the raw scroll state here
-        !listState.canScrollForward
-      }
+      // Read the raw scroll state here
+      !listState.canScrollForward
+    }
       .collectLatest { rawAtBottom ->
         if (!rawAtBottom) {
           delay(500)
@@ -241,11 +249,11 @@ fun ChatPanel(
 
   // Stores the index of the last user message as a derived state.
   val lastUserMessageIndex by
-    remember(currentMessages) {
-      derivedStateOf {
-        currentMessages.indexOfLast { it is ChatMessageText && it.side == ChatSide.USER }
-      }
+  remember(currentMessages) {
+    derivedStateOf {
+      currentMessages.indexOfLast { it is ChatMessageText && it.side == ChatSide.USER }
     }
+  }
 
   // Stores the dynamic bottom padding required to push the last user message to the top edge of the
   // view.
@@ -263,7 +271,7 @@ fun ChatPanel(
         val prevMessage = currentMessages.getOrNull(startIndex - 1)
         if (
           prevMessage != null &&
-            (prevMessage is ChatMessageImage || prevMessage is ChatMessageAudioClip)
+          (prevMessage is ChatMessageImage || prevMessage is ChatMessageAudioClip)
         ) {
           startIndex -= 1
         }
@@ -377,8 +385,8 @@ fun ChatPanel(
               extraPaddingStart = 0.dp
               if (
                 message.type !== ChatMessageType.LOADING &&
-                  message.type !== ChatMessageType.WEBVIEW &&
-                  message.type !== ChatMessageType.COLLAPSABLE_PROGRESS_PANEL
+                message.type !== ChatMessageType.WEBVIEW &&
+                message.type !== ChatMessageType.COLLAPSABLE_PROGRESS_PANEL
               ) {
                 extraPaddingEnd = 48.dp
               }
@@ -609,7 +617,7 @@ fun ChatPanel(
         // Loading screen when model is initialized for that first time.
         val isFirstInitializing =
           modelInitializationStatus?.status == ModelInitializationStatusType.INITIALIZING &&
-            modelInitializationStatus.isFirstInitialization(selectedModel)
+                  modelInitializationStatus.isFirstInitialization(selectedModel)
         Column(
           horizontalAlignment = Alignment.CenterHorizontally,
           verticalArrangement = Arrangement.Center,
@@ -702,6 +710,7 @@ fun ChatPanel(
             ),
           )
         },
+        onPromptLibraryClicked = onPromptLibraryClicked, // Connected action parameter hookup
         onStopButtonClicked = onStopButtonClicked,
         onSetAudioRecorderVisible = { start ->
           showAudioRecorder = start

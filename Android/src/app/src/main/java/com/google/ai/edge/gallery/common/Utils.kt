@@ -75,6 +75,8 @@ inline fun <reified T> getJsonResponse(url: String): JsonObjAndTextContent<T>? {
   try {
     val connection = URL(url).openConnection() as HttpURLConnection
     connection.requestMethod = "GET"
+    connection.connectTimeout = 5000 // 5 seconds
+    connection.readTimeout = 5000    // 5 seconds
     connection.connect()
 
     val responseCode = connection.responseCode

@@ -17,6 +17,8 @@
 package com.google.ai.edge.gallery.ui.common.chat
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -71,6 +73,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.rounded.AudioFile
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FlipCameraAndroid
 import androidx.compose.material.icons.rounded.History
@@ -127,6 +130,7 @@ import com.google.ai.edge.gallery.common.AudioClip
 import com.google.ai.edge.gallery.common.convertWavToMonoWithMaxSeconds
 import com.google.ai.edge.gallery.common.decodeSampledBitmapFromUri
 import com.google.ai.edge.gallery.common.rotateBitmap
+import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.MAX_AUDIO_CLIP_COUNT
 import com.google.ai.edge.gallery.data.MAX_IMAGE_COUNT
 import com.google.ai.edge.gallery.data.MAX_IMAGE_COUNT_AI_CORE
@@ -134,6 +138,7 @@ import com.google.ai.edge.gallery.data.RuntimeType
 import com.google.ai.edge.gallery.data.SAMPLE_RATE
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.ui.common.getTaskIconColor
+import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
 import com.google.ai.edge.gallery.ui.theme.bodyLargeNarrow
 import java.io.FileInputStream
@@ -167,6 +172,7 @@ fun MessageInputText(
   onSendMessage: (List<ChatMessage>) -> Unit,
   modelPreparing: Boolean = false,
   onOpenPromptTemplatesClicked: () -> Unit = {},
+  onPromptLibraryClicked: () -> Unit = {},
   onStopButtonClicked: () -> Unit = {},
   onSetAudioRecorderVisible: (visible: Boolean) -> Unit = {},
   onAmplitudeChanged: (Int) -> Unit,
@@ -650,6 +656,18 @@ fun MessageInputText(
                         },
                       )
                     }
+                  }
+
+                  // New Prompt Library Button
+                  IconButton(
+                    onClick = onPromptLibraryClicked,
+                    enabled = !inProgress && !isResettingSession && !modelInitializing
+                  ) {
+                    Icon(
+                      Icons.Rounded.Bookmark,
+                      contentDescription = "Prompt Library",
+                      tint = MaterialTheme.colorScheme.primary
+                    )
                   }
 
                   // Skills.

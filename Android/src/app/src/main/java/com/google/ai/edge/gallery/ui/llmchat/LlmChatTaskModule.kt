@@ -157,6 +157,7 @@ class LlmChatTask @Inject constructor() : CustomTask {
     LlmChatScreen(
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
+      onPromptLibraryClicked = myData.onPromptLibraryClicked,
       viewModel = viewModel,
       allowEditingSystemPrompt = true,
       curSystemPrompt = uiSystemPrompt,
@@ -188,6 +189,7 @@ class LlmChatTask @Inject constructor() : CustomTask {
         }
       },
       sendMessageTrigger = sendMessageTrigger,
+      promptToInput = myData.selectedPrompt,
     )
   }
 }
@@ -295,6 +297,7 @@ class LlmAskImageTask @Inject constructor() : CustomTask {
     LlmAskImageScreen(
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
+      onPromptLibraryClicked = myData.onPromptLibraryClicked,
       viewModel = viewModel,
       allowEditingSystemPrompt = true,
       curSystemPrompt = uiSystemPrompt,
@@ -308,6 +311,7 @@ class LlmAskImageTask @Inject constructor() : CustomTask {
         )
       },
       sendMessageTrigger = sendMessageTrigger,
+      promptToInput = myData.selectedPrompt,
     )
   }
 }
@@ -416,6 +420,7 @@ class LlmAskAudioTask @Inject constructor() : CustomTask {
     LlmAskAudioScreen(
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
+      onPromptLibraryClicked = myData.onPromptLibraryClicked,
       viewModel = viewModel,
       allowEditingSystemPrompt = true,
       curSystemPrompt = uiSystemPrompt,
@@ -429,6 +434,7 @@ class LlmAskAudioTask @Inject constructor() : CustomTask {
         )
       },
       sendMessageTrigger = sendMessageTrigger,
+      promptToInput = myData.selectedPrompt,
     )
   }
 }

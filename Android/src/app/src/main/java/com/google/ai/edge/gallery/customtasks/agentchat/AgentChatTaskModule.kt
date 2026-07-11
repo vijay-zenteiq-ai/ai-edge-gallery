@@ -192,8 +192,10 @@ class AgentChatTask @Inject constructor() : CustomTask {
       task = task,
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
+      onPromptLibraryClicked = myData.onPromptLibraryClicked,
       agentTools = agentTools,
       initialQuery = myData.initialQuery,
+      promptToInput = myData.selectedPrompt,
     )
   }
 }

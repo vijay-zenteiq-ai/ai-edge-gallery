@@ -88,6 +88,9 @@ import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.firebaseAnalytics
+import com.google.ai.edge.gallery.proto.McpServer
+import com.google.ai.edge.gallery.proto.McpTool
+import com.google.ai.edge.gallery.proto.Skill
 import com.google.ai.edge.gallery.ui.common.BaseGalleryWebViewClient
 import com.google.ai.edge.gallery.ui.common.GalleryWebView
 import com.google.ai.edge.gallery.ui.common.buildTrackableUrlAnnotatedString
@@ -105,6 +108,7 @@ import com.google.ai.edge.gallery.ui.llmchat.LlmChatScreen
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
 import com.google.ai.edge.gallery.ui.modelmanager.ModelInitializationStatusType
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
+import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.tool
 import java.lang.Exception
@@ -124,11 +128,13 @@ fun AgentChatScreen(
   task: Task,
   modelManagerViewModel: ModelManagerViewModel,
   navigateUp: () -> Unit,
+  onPromptLibraryClicked: () -> Unit, // Injected callback configuration
   agentTools: AgentTools,
   viewModel: LlmChatViewModel = hiltViewModel(),
   skillManagerViewModel: SkillManagerViewModel = hiltViewModel(),
   mcpManagerViewModel: McpManagerViewModel = hiltViewModel(),
   initialQuery: String? = null,
+  promptToInput: String? = null,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -154,41 +160,33 @@ fun AgentChatScreen(
   var sendMessageTrigger by remember { mutableStateOf<SendMessageTrigger?>(null) }
   var showAlertForDisabledSkill by remember { mutableStateOf(false) }
   var disabledSkillName by remember { mutableStateOf("") }
-
   var currentPermissionAction by remember { mutableStateOf<RequestPermissionAgentAction?>(null) }
   val permissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-      permissionGranted ->
+        permissionGranted ->
       currentPermissionAction?.result?.complete(permissionGranted)
       currentPermissionAction = null
     }
-
   LaunchedEffect(task) { viewModel.loadSystemPrompt(task) }
   val uiSystemPrompt by viewModel.uiSystemPrompt.collectAsState()
-
   // Collect UI states from view models. Ensure launched effect is triggered when the UI state is
   // updated.
   val llmChatUiState by viewModel.uiState.collectAsState()
   val modelManagerUiState by modelManagerViewModel.uiState.collectAsState()
   val skillUiState by skillManagerViewModel.uiState.collectAsState()
   val mcpUiState by mcpManagerViewModel.uiState.collectAsState()
-
   val skillCount = skillUiState.skills.count { it.skill.selected }
   val mcpCount = mcpUiState.mcpServers.count { it.mcpServer.enabled }
   val mcpToolsCount =
     mcpUiState.mcpServers
       .filter { it.mcpServer.enabled }
       .sumOf { it.mcpServer.toolsList.count { tool -> tool.enabled } }
-
   LaunchedEffect(uiSystemPrompt, mcpToolsCount) {
     curSystemPrompt = getEffectiveBaseSystemPrompt(uiSystemPrompt, mcpToolsCount > 0)
   }
-
   val selectedModel = modelManagerUiState.selectedModel
   val modelInitStatus = modelManagerUiState.modelInitializationStatus[selectedModel.name]
-
   var initialQueryConsumed by remember { mutableStateOf(false) }
-
   LaunchedEffect(
     llmChatUiState.isResettingSession,
     modelInitStatus?.status,
@@ -199,9 +197,9 @@ fun AgentChatScreen(
     // query is not consumed yet.
     if (
       !initialQuery.isNullOrEmpty() &&
-        !initialQueryConsumed &&
-        modelInitStatus?.status == ModelInitializationStatusType.INITIALIZED &&
-        !llmChatUiState.isResettingSession
+      !initialQueryConsumed &&
+      modelInitStatus?.status == ModelInitializationStatusType.INITIALIZED &&
+      !llmChatUiState.isResettingSession
     ) {
       initialQueryConsumed = true
       sendMessageTrigger =
@@ -211,14 +209,15 @@ fun AgentChatScreen(
         )
     }
   }
-
   LlmChatScreen(
     modelManagerViewModel = modelManagerViewModel,
     taskId = BuiltInTaskId.LLM_AGENT_CHAT,
     navigateUp = navigateUp,
+    onPromptLibraryClicked = onPromptLibraryClicked, // Passed callback downward into downstream subcomponents
     skillCount = skillCount,
     mcpCount = mcpCount,
     mcpToolsCount = mcpToolsCount,
+    promptToInput = promptToInput,
     onFirstToken = { model ->
       scope.launch(Dispatchers.Main) {
         updateProgressPanel(viewModel = viewModel, model = model, agentTools = agentTools)
@@ -247,7 +246,6 @@ fun AgentChatScreen(
           // Clean up.
           agentTools.resultImageToShow = null
         }
-
         // Show any webview produced by tools.
         agentTools.resultWebviewToShow?.let { webview ->
           val url = webview.url ?: ""
@@ -263,8 +261,7 @@ fun AgentChatScreen(
                 hideSenderLabel = true,
               ),
           )
-          // Clean up.
-          agentTools.resultWebviewToShow = null
+          // Clean up.          agentTools.resultWebviewToShow = null
         }
         updateProgressPanel(viewModel = viewModel, model = model, agentTools = agentTools)
       }
@@ -287,7 +284,7 @@ fun AgentChatScreen(
     showImagePicker = true,
     showAudioPicker = true,
     getActiveSkills = {
-      skillManagerViewModel.getSelectedSkills().map { skill ->
+      skillManagerViewModel.getSelectedSkills().map { skill: Skill ->
         skillManagerViewModel.getSkillShortId(skill)
       }
     },
@@ -322,7 +319,7 @@ fun AgentChatScreen(
                   action.url
                 }
               val skill = skillManagerViewModel.getSkill(name = skillName)
-              val skillId = skill?.let { skillManagerViewModel.getSkillShortId(it) } ?: "xxxx"
+              val skillId = skill?.let { s: Skill -> skillManagerViewModel.getSkillShortId(s) } ?: "xxxx"
               try {
                 // Set up a safety net timeout so we NEVER hang the chat or tool execution
                 launch {
@@ -340,15 +337,13 @@ fun AgentChatScreen(
                         putString("skill_name", skillName)
                         putString("skill_id", skillId)
                         putBoolean("success", false)
-                        putString("error_type", "timeout")
-                      },
+                        putString("error_type", "timeout")                      },
                     )
                     action.result.complete(
                       "{\"error\": \"Skill execution timed out. Please check network connection.\"}"
                     )
                   }
                 }
-
                 // Load url.
                 suspendCancellableCoroutine<Unit> { continuation ->
                   chatWebViewClient.setPageLoadListener {
@@ -358,7 +353,6 @@ fun AgentChatScreen(
                   Log.d(TAG, "Loading url: ${action.url}")
                   webViewRef?.loadUrl(action.url)
                 }
-
                 // Execute JS.
                 Log.d(TAG, "Start to run js")
                 chatViewJavascriptInterface.onResultListener = { result ->
@@ -381,7 +375,6 @@ fun AgentChatScreen(
                     },
                   )
                 }
-
                 val safeData = JSONObject.quote(action.data)
                 val safeSecret = JSONObject.quote(action.secret)
                 val script =
@@ -438,7 +431,6 @@ fun AgentChatScreen(
           }
         }
       }
-
       GalleryWebView(
         modifier = Modifier.size(300.dp),
         onWebViewCreated = { webView ->
@@ -469,7 +461,7 @@ fun AgentChatScreen(
             Log.d(
               TAG,
               "${curConsoleMessage.message()} " +
-                "-- From line ${curConsoleMessage.lineNumber()} of ${curConsoleMessage.sourceId()}",
+                      "-- From line ${curConsoleMessage.lineNumber()} of ${curConsoleMessage.sourceId()}",
             )
           }
         },
@@ -544,7 +536,6 @@ fun AgentChatScreen(
             }
           }
         }
-
         Row(
           modifier =
             Modifier.align(Alignment.BottomCenter)
@@ -556,14 +547,14 @@ fun AgentChatScreen(
           for (promptChip in TRYOUT_CHIPS) {
             if (
               promptChip.skillName == "learn-something-new" &&
-                selectedModel.name != "Gemma-4-E4B-it"
+              selectedModel.name != "Gemma-4-E4B-it"
             ) {
               continue
             }
             FilledTonalButton(
               enabled =
                 modelInitializationStatus?.status == ModelInitializationStatusType.INITIALIZED &&
-                  !uiState.isResettingSession,
+                        !uiState.isResettingSession,
               onClick = {
                 // Skill is selected, trigger sending the message.
                 if (skillManagerViewModel.isSkillSelected(promptChip.skillName)) {
@@ -599,7 +590,6 @@ fun AgentChatScreen(
     },
     sendMessageTrigger = sendMessageTrigger,
   )
-
   if (showAskInfoDialog && currentAskInfoAction != null) {
     val action = currentAskInfoAction!!
     SecretEditorDialog(
@@ -619,7 +609,6 @@ fun AgentChatScreen(
       },
     )
   }
-
   if (currentMcpPermissionAction != null) {
     val action = currentMcpPermissionAction!!
     McpToolCallPermissionDialog(
@@ -644,7 +633,6 @@ fun AgentChatScreen(
       },
     )
   }
-
   if (showSkillManagerBottomSheet) {
     SkillManagerBottomSheet(
       agentTools = agentTools,
@@ -652,7 +640,6 @@ fun AgentChatScreen(
       onDismiss = { selectedSkillsChanged ->
         // Hide sheet.
         showSkillManagerBottomSheet = false
-
         // Reset session when selected skills changed.
         if (selectedSkillsChanged) {
           Log.d(TAG, "Selected skill changed. Resetting conversation.")
@@ -668,7 +655,6 @@ fun AgentChatScreen(
       },
     )
   }
-
   if (showMcpManagerBottomSheet) {
     McpManagerBottomSheet(
       mcpManagerViewModel = mcpManagerViewModel,
@@ -688,7 +674,6 @@ fun AgentChatScreen(
       },
     )
   }
-
   if (showAlertForDisabledSkill) {
     AlertDialog(
       onDismissRequest = { showAlertForDisabledSkill = false },
@@ -712,7 +697,7 @@ private fun updateProgressPanel(viewModel: LlmChatViewModel, model: Model, agent
     )
   if (
     lastProgressPanelMessage != null &&
-      lastProgressPanelMessage is ChatMessageCollapsableProgressPanel
+    lastProgressPanelMessage is ChatMessageCollapsableProgressPanel
   ) {
     if (lastProgressPanelMessage.title.startsWith("Loading")) {
       agentTools.sendAgentAction(
@@ -782,12 +767,10 @@ private fun resetSessionWithCurrentSkillsAndMcps(
     enableConversationConstrainedDecoding = true,
     initialMessages = litertMessages,
     clearHistory = clearHistory,
-  )
-}
+  )}
 
 class ChatWebViewJavascriptInterface {
   var onResultListener: ((String) -> Unit)? = null
-
   @JavascriptInterface
   fun onResultReady(result: String) {
     onResultListener?.invoke(result)
@@ -796,11 +779,9 @@ class ChatWebViewJavascriptInterface {
 
 class ChatWebViewClient(val context: Context) : BaseGalleryWebViewClient(context = context) {
   private var onPageLoaded: (() -> Unit)? = null
-
   fun setPageLoadListener(listener: (() -> Unit)?) {
     onPageLoaded = listener
   }
-
   override fun onPageFinished(view: WebView?, url: String?) {
     super.onPageFinished(view, url)
     Log.d(TAG, "page loaded")
