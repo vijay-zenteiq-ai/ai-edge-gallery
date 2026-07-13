@@ -288,9 +288,7 @@ fun HomeScreen(
                 description = stringResource(R.string.drawer_models_description),
                 icon = Icons.AutoMirrored.Rounded.ListAlt,
                 onClick = {
-                  scope.launch { drawerState.close() }
                   scope.launch {
-                    delay(50)
                     onModelsClicked()
                   }
                 },
@@ -312,9 +310,7 @@ fun HomeScreen(
                 description = stringResource(R.string.drawer_prompt_library_description),
                 icon = Icons.AutoMirrored.Rounded.ListAlt, // Use a suitable icon, maybe Icons.Rounded.Note
                 onClick = {
-                  scope.launch { drawerState.close() }
                   scope.launch {
-                    delay(50)
                     onPromptsClicked()
                   }
                 },

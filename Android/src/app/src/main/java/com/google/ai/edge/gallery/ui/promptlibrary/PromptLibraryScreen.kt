@@ -17,23 +17,23 @@
 package com.google.ai.edge.gallery.ui.promptlibrary
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.List
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,12 +45,14 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.ai.edge.gallery.data.Prompt
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PromptLibraryScreen(
     navigateUp: () -> Unit,
@@ -62,17 +64,46 @@ fun PromptLibraryScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    // Core state pointers hoisted directly out of local recomposition loops
     var searchQuery by remember { mutableStateOf("") }
     var titleText by remember { mutableStateOf("") }
     var promptInstructionText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("ENGINEERING") }
 
-    var currentTab by remember { mutableStateOf(0) }
+    var currentTab by remember { mutableIntStateOf(0) }
 
     var editingPromptId by remember { mutableStateOf<Long?>(null) }
+    var editingOriginalTitle by remember { mutableStateOf("") }
     var activeViewItem by remember { mutableStateOf<Prompt?>(null) }
     var activeDeleteId by remember { mutableStateOf<Long?>(null) }
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    val handleBack: () -> Unit = {
+        if (uiState.errorMessage != null) {
+            viewModel.clearError()
+        } else if (activeViewItem != null) {
+            activeViewItem = null
+        } else if (activeDeleteId != null) {
+            activeDeleteId = null
+        } else if (searchQuery.isNotEmpty()) {
+            searchQuery = ""
+        } else if (currentTab != 0) {
+            currentTab = 0
+        } else if (editingPromptId != null || titleText.isNotEmpty() || promptInstructionText.isNotEmpty()) {
+            titleText = ""
+            promptInstructionText = ""
+            editingPromptId = null
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        } else {
+            navigateUp()
+        }
+    }
+
+    BackHandler(enabled = true) {
+        handleBack()
+    }
 
     Scaffold(
         topBar = {
@@ -84,8 +115,8 @@ fun PromptLibraryScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = navigateUp) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
+                    IconButton(onClick = handleBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -95,132 +126,225 @@ fun PromptLibraryScreen(
                 NavigationBarItem(
                     selected = currentTab == 0,
                     onClick = { currentTab = 0 },
-                    icon = { Icon(Icons.Rounded.List, contentDescription = "Library") },
+                    icon = { Icon(Icons.AutoMirrored.Rounded.List, contentDescription = "Library") },
                     label = { Text("Library") }
                 )
                 NavigationBarItem(
                     selected = currentTab == 1,
                     onClick = { currentTab = 1 },
-                    icon = { Icon(Icons.Rounded.Star, contentDescription = "Favorites") },
+                    icon = { Icon(Icons.Default.Star, contentDescription = "Favorites") },
                     label = { Text("Favorites") }
                 )
             }
         }
     ) { innerPadding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
+                .padding(innerPadding),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Search Input Container Block
             item {
-                Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(), // CHANGED: Removed .zIndex(5f) layout block constraint
-                    placeholder = { Text("Search your prompts...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search bar icon") },
-                    shape = RoundedCornerShape(24.dp),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        }
+                Column(modifier = Modifier.padding(horizontal = 16.dp).padding(top = 4.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Search your prompts...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search bar icon") },
+                        shape = RoundedCornerShape(24.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                        )
                     )
-                )
+                }
             }
 
             // Forms Layout Panel
             if (currentTab == 0) {
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = if (editingPromptId != null) "Edit Prompt" else "Add New Prompt",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-
-                            Text("Title", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                            OutlinedTextField(
-                                value = titleText,
-                                onValueChange = { titleText = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp), // CHANGED: Removed .zIndex(10f) layout block constraint
-                                placeholder = { Text("e.g. Python Docstring Gen", color = Color.Gray) },
-                                shape = RoundedCornerShape(8.dp),
-                                singleLine = true
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text("Prompt Text", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                            OutlinedTextField(
-                                value = promptInstructionText,
-                                onValueChange = { promptInstructionText = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(110.dp)
-                                    .padding(vertical = 4.dp), // CHANGED: Removed .zIndex(10f) layout block constraint
-                                placeholder = { Text("Enter your prompt instructions here...", color = Color.Gray) },
-                                shape = RoundedCornerShape(8.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 if (editingPromptId != null) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            titleText = ""
-                                            promptInstructionText = ""
-                                            editingPromptId = null
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(24.dp)
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.padding(bottom = 16.dp).fillMaxWidth()
                                     ) {
-                                        Text("Cancel")
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Editing Mode",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = "You are currently updating '$editingOriginalTitle'.",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            }
+                                        }
                                     }
                                 }
 
-                                Button(
-                                    onClick = {
-                                        if (titleText.isNotBlank() && promptInstructionText.isNotBlank()) {
-                                            viewModel.saveOrUpdatePrompt(
-                                                existingId = editingPromptId,
-                                                title = titleText,
-                                                text = promptInstructionText,
-                                                category = selectedCategory
+                                if (uiState.errorMessage != null) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.padding(bottom = 16.dp).fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = MaterialTheme.colorScheme.error
                                             )
-                                            titleText = ""
-                                            promptInstructionText = ""
-                                            editingPromptId = null
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Duplicate Entry",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.error
+                                                )
+                                                Text(
+                                                    text = uiState.errorMessage!!,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = { viewModel.clearError() },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Dismiss error",
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                            }
                                         }
-                                    },
-                                    modifier = Modifier.weight(2f),
-                                    shape = RoundedCornerShape(24.dp)
+                                    }
+                                }
+
+                                Text(
+                                    text = if (editingPromptId != null) "Update Prompt Details" else "Add New Prompt",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+
+                                Text("Title", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                OutlinedTextField(
+                                    value = titleText,
+                                    onValueChange = { if (it.length <= 50) titleText = it },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    placeholder = { Text("e.g. Python Docstring Gen", color = Color.Gray) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    singleLine = true,
+                                    supportingText = {
+                                        Text(
+                                            text = "${titleText.length} / 50",
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.End,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text("Prompt Text", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                OutlinedTextField(
+                                    value = promptInstructionText,
+                                    onValueChange = { if (it.length <= 1000) promptInstructionText = it },
+                                    modifier = Modifier.fillMaxWidth().height(140.dp).padding(top = 4.dp),
+                                    placeholder = { Text("Enter your prompt instructions here...", color = Color.Gray) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    supportingText = {
+                                        Text(
+                                            text = "${promptInstructionText.length} / 1000",
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.End,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(painterResource(id = android.R.drawable.ic_menu_save), contentDescription = "Save graphic icon")
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(if (editingPromptId != null) "Update Prompt" else "Save Prompt")
+                                    if (editingPromptId != null) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                titleText = ""
+                                                promptInstructionText = ""
+                                                editingPromptId = null
+                                                focusManager.clearFocus()
+                                                keyboardController?.hide()
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ) {
+                                            Text("Cancel")
+                                        }
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            if (titleText.isNotBlank() && promptInstructionText.isNotBlank()) {
+                                                viewModel.saveOrUpdatePrompt(
+                                                    existingId = editingPromptId,
+                                                    title = titleText,
+                                                    text = promptInstructionText,
+                                                    category = selectedCategory
+                                                )
+                                                titleText = ""
+                                                promptInstructionText = ""
+                                                editingPromptId = null
+                                                focusManager.clearFocus()
+                                                keyboardController?.hide()
+                                            }
+                                        },
+                                        modifier = Modifier.weight(2f),
+                                        shape = RoundedCornerShape(24.dp)
+                                    ) {
+                                        Icon(painterResource(id = android.R.drawable.ic_menu_save), contentDescription = "Save")
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(if (editingPromptId != null) "Update Prompt" else "Save Prompt")
+                                    }
                                 }
                             }
                         }
@@ -231,7 +355,7 @@ fun PromptLibraryScreen(
             // Headers Ribbon Segment
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -254,7 +378,7 @@ fun PromptLibraryScreen(
             if (filteredPrompts.isEmpty()) {
                 item {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(40.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(vertical = 40.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -266,30 +390,33 @@ fun PromptLibraryScreen(
                 }
             } else {
                 items(filteredPrompts, key = { it.id }) { item ->
-                    PromptItemCard(
-                        promptItem = item,
-                        timestampText = viewModel.formatTimestamp(item.lastUpdated),
-                        onDelete = { activeDeleteId = item.id },
-                        onView = { activeViewItem = item },
-                        onFavoriteToggle = { viewModel.toggleFavorite(item) },
-                        onEdit = {
-                            currentTab = 0
-                            editingPromptId = item.id
-                            titleText = item.title
-                            promptInstructionText = item.text
-                            selectedCategory = item.category
-                            Toast.makeText(context, "Loaded into editor!", Toast.LENGTH_SHORT).show()
-                        },
-                        onSelect = if (onPromptSelected != null) {
-                            { onPromptSelected(item.text) }
-                        } else null
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        PromptItemCard(
+                            promptItem = item,
+                            timestampText = viewModel.formatTimestamp(item.lastUpdated),
+                            onDelete = { activeDeleteId = item.id },
+                            onView = { activeViewItem = item },
+                            onFavoriteToggle = { viewModel.toggleFavorite(item) },
+                            onEdit = {
+                                currentTab = 0
+                                editingPromptId = item.id
+                                editingOriginalTitle = item.title
+                                titleText = item.title
+                                promptInstructionText = item.text
+                                selectedCategory = item.category
+                                scope.launch {
+                                    listState.animateScrollToItem(0)
+                                }
+                            },
+                            onSelect = if (onPromptSelected != null) {
+                                { onPromptSelected(item.text) }
+                            } else null
+                        )
+                    }
                 }
             }
 
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 
@@ -306,7 +433,7 @@ fun PromptLibraryScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Divider()
+                    HorizontalDivider()
                     Text(
                         text = prompt.text,
                         style = MaterialTheme.typography.bodyLarge,
@@ -393,7 +520,7 @@ fun PromptItemCard(
 
                 IconButton(onClick = onFavoriteToggle, modifier = Modifier.size(24.dp)) {
                     Icon(
-                        imageVector = if (promptItem.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        imageVector = if (promptItem.isFavorite) Icons.Default.Star else Icons.Outlined.StarBorder,
                         contentDescription = "Favorite selection tracking status",
                         tint = if (promptItem.isFavorite) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -443,7 +570,7 @@ fun PromptItemCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onView) {
                         Icon(
-                            painter = painterResource(id = android.R.drawable.ic_menu_view),
+                            imageVector = Icons.Outlined.Visibility,
                             contentDescription = "Preview full item popup trigger",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -459,7 +586,7 @@ fun PromptItemCard(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Trigger warning validation modal",
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

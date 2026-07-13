@@ -210,7 +210,7 @@ fun GalleryNavHost(
           },
           onModelsClicked = { navController.navigate(ROUTE_MODEL_MANAGER) },
           onNotificationsClicked = { navController.navigate(ROUTE_NOTIFICATIONS) },
-          onPromptsClicked = { navController.navigate(ROUTE_PROMPT_LIBRARY) },
+          onPromptsClicked = { navController.navigate("$ROUTE_PROMPT_LIBRARY?selectionMode=false") },
           gm4 = true,
         )
       }
@@ -300,7 +300,7 @@ fun GalleryNavHost(
                     lastNavigatedModelName = ""
                     navController.navigateUp()
                   },
-                  onPromptLibraryClicked = { navController.navigate(ROUTE_PROMPT_LIBRARY) },
+                  onPromptLibraryClicked = { navController.navigate("$ROUTE_PROMPT_LIBRARY?selectionMode=true") },
                   initialQuery = queryParam,
                   selectedPrompt = selectedPrompt,
                 )
@@ -413,16 +413,25 @@ fun GalleryNavHost(
 
     // Prompt Library page
     composable(
-      route = ROUTE_PROMPT_LIBRARY,
+      route = "$ROUTE_PROMPT_LIBRARY?selectionMode={selectionMode}",
+      arguments = listOf(
+        navArgument("selectionMode") {
+          type = NavType.BoolType
+          defaultValue = false
+        }
+      ),
       enterTransition = { slideUpEnter() },
       exitTransition = { slideDownExit() },
-    ) {
+    ) { backStackEntry ->
+      val selectionMode = backStackEntry.arguments?.getBoolean("selectionMode") ?: false
       PromptLibraryScreen(
         navigateUp = { navController.navigateUp() },
-        onPromptSelected = { prompt ->
-          navController.previousBackStackEntry?.savedStateHandle?.set("selected_prompt", prompt)
-          navController.navigateUp()
-        }
+        onPromptSelected = if (selectionMode) {
+          { prompt ->
+            navController.previousBackStackEntry?.savedStateHandle?.set("selected_prompt", prompt)
+            navController.navigateUp()
+          }
+        } else null
       )
     }
 
